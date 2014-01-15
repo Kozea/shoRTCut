@@ -18,6 +18,14 @@ tornado.options.define("port", default=3615, type=int, help="Server port")
 tornado.options.define("turn_server", default='', help="TURN server")
 tornado.options.define("turn_username", default='', help="TURN username")
 tornado.options.define("turn_password", default='', help="TURN password")
+tornado.options.define("ssl_cert",
+                       default=os.path.join(
+                           os.path.dirname(__file__), 'server.crt'),
+                       help="SSL cert file")
+tornado.options.define("ssl_key",
+                       default=os.path.join(
+                           os.path.dirname(__file__), 'server.key'),
+                       help="SSL key file")
 
 host = 'webrtc.l'
 tornado.options.parse_command_line()
@@ -60,8 +68,8 @@ ioloop = tornado.ioloop.IOLoop.instance()
 
 from app import application
 tornado.httpserver.HTTPServer(application, ssl_options={
-    'certfile': os.path.join(os.path.dirname(__file__), 'server.crt'),
-    'keyfile': os.path.join(os.path.dirname(__file__), 'server.key'),
+    'certfile': tornado.options.options.ssl_cert,
+    'keyfile': tornado.options.options.ssl_key,
 }).listen(tornado.options.options.port)
 
 
