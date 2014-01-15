@@ -1,55 +1,66 @@
 import tornado.websocket
+from collections import defaultdict
 from app import url, Route
-from logging import getLogger
+from uuid import uuid4
 
-log = getLogger('apparatus')
 
-@url(r'/(caller|callee)?')
+@url(r'/([^/]*)')
 class Index(Route):
-    def get(self, type):
+    def get(self, uid):
+        if not uid:
+            return self.redirect('/%s' % uuid4())
         return self.render('index.html')
 
 
-@url(r'/ws')
+@url(r'/ws/(.+)')
 class WebSocket(Route, tornado.websocket.WebSocketHandler):
-    caller = None
-    callee = None
+    websockets = defaultdict(list)
 
-    def open(self):
-        log.info('Websocket opened')
+    @property
+    def room(self):
+        return WebSocket.websockets[self.id]
+
+    @property
+    def correspondent(self):
+        return self.room[1 - self.room.index(self)]
+
+    def open(self, uid):
+        self.log.info('Websocket opened with id %s' % uid)
+        self.id = uid.decode('utf-8')
+
+        if len(self.room) >= 2:
+            self.send('FULL')
+        else:
+            self.room.append(self)
+            self.send('INIT')
+
+    def send(self, message):
+        self.log.debug('WS -> %s' % message)
+        self.write_message(message)
 
     def on_message(self, message):
-        log.debug('Websocket %s' % message)
+        self.log.debug('WS <- %s' % message)
         if '|' in message:
             pipe = message.index('|')
             cmd, data = message[:pipe], message[pipe + 1:]
         else:
             cmd, data = message, ''
 
-        if cmd == 'IAM':
-            if data == 'caller':
-                WebSocket.caller = self
-            elif  data == 'callee':
-                WebSocket.callee = self
-            if WebSocket.callee and WebSocket.caller:
-                WebSocket.caller.write_message('GO')
+        if cmd == 'READY':
+            if len(self.room) == 2:
+                # First to connect is the caller
+                self.room[0].send('START')
+            else:
+                self.send('WAIT')
 
         elif cmd == 'STATUS':
-            self.write_message('ECHO|Status: caller: %r callee: %r' % (
-                WebSocket.caller, WebSocket.callee))
+            self.send('ECHO|Status: room: %r (ws: %r)' % (
+                self.room, WebSocket.websockets))
         else:
-            if WebSocket.caller == self:
-                log.info('Caller -> Callee : %s' % message)
-                WebSocket.callee and WebSocket.callee.write_message(message)
-            if WebSocket.callee == self:
-                log.info('Callee <- Callee : %s' % message)
-                WebSocket.caller and WebSocket.caller.write_message(message)
+            self.correspondent.send(message)
 
     def on_close(self):
-        log.info('Websocket closed')
-        if self == WebSocket.caller:
-            WebSocket.caller = None
-        if self == WebSocket.callee:
-            WebSocket.callee = None
-
-
+        self.log.info('Websocket closed')
+        self.room.remove(self)
+        if len(self.room) == 1:
+            self.room[0].send('RESET')

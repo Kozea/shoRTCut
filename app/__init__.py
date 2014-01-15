@@ -2,6 +2,9 @@ import os
 import tornado.web
 import tornado.options
 import tornado.web
+from logging import getLogger
+
+log = getLogger('webrtc')
 
 
 application = tornado.web.Application(

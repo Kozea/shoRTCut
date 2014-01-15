@@ -1,11 +1,28 @@
-/* line 3, ../sass/main.sass */
-video.remote {
-  margin: auto;
-  width: 75%;
+/* line 1, ../sass/main.sass */
+html, body {
+  height: 100%;
+  margin: 0;
 }
 
-/* line 7, ../sass/main.sass */
+/* line 5, ../sass/main.sass */
+.videos {
+  display: flex;
+  justify-content: space-between;
+  align-content: flex-end;
+  height: 100%;
+}
+
+/* line 11, ../sass/main.sass */
+video {
+  max-height: 720px;
+  max-width: 1280px;
+}
+/* line 12, ../sass/main.sass */
+video.remote {
+  flex: 4;
+}
+/* line 15, ../sass/main.sass */
 video.local {
-  width: 50%;
-  margin: auto;
+  align-self: flex-end;
+  flex: 1;
 }

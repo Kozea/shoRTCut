@@ -1,1 +1,34 @@
-{% extends "_base.html" %}
+{% import tornado.options %}
+{% import json %}
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="Kozea">
+    <link rel="shortcut icon" href="{{ static_url('images/favicon.png') }}">
+
+    <title>WebRTC</title>
+    <link href="{{ static_url('stylesheets/bootstrap/bootstrap.css') }}" rel="stylesheet">
+    <link href="{{ static_url('stylesheets/main.css') }}" rel="stylesheet">
+    <script>
+      var options = {% raw json.dumps(dict(tornado.options.options.items())) %};
+    </script>
+  </head>
+
+  <body>
+    <section class="videos">
+        <video class="remote" autoplay></video>
+        <video class="local" autoplay muted="muted"></video>
+    </section>
+
+
+    <script src="{{ static_url('javascripts/jquery-1.10.2.min.js') }}"></script>
+    <script src="{{ static_url('javascripts/bootstrap.min.js') }}"></script>
+    <script src="{{ static_url('javascripts/adapter.js') }}"></script>
+    <script src="{{ static_url('javascripts/main.js') }}"></script>
+  </body>
+</html>

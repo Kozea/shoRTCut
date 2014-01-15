@@ -4,12 +4,14 @@ from subprocess import Popen
 from glob import glob
 import time
 import shlex
+import sys
+
 
 commands = [
     'coffee -wcb -j app/static/javascripts/main.js ' +
     ' '.join(glob('app/static/coffees/*.coffee')),
     'compass watch app/static',
-    'python serve.py'
+    'python serve.py ' + ' '.join(sys.argv[1:])
 ]
 
 
@@ -32,7 +34,7 @@ class Run(Process):
 
 process = [Run(cmd) for cmd in commands]
 for proc in process:
-    print('Lauching %s' % proc.cmd.split(' ')[0])
+    print('Lauching %s' % proc.cmd)
     proc.start()
 
 try:
