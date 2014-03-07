@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright (C) 2014 by Florian Mounier, Kozea
-# This file is part of webrtc, licensed under a 3-clause BSD licens
+# This file is part of shoRTCut, licensed under a 3-clause BSD licens
 
 """
-webrtc - WebRTC Websocket signalling server implementation
+shoRTCut - WebRTC Websocket signalling server implementation
 """
 
 from setuptools import find_packages, setup
@@ -15,7 +15,7 @@ import datetime
 VERSION = "git-" + datetime.datetime.now().isoformat()
 
 options = dict(
-    name="webrtc",
+    name="shoRTCut",
     version=VERSION,
     description="WebRTC Websocket signalling server implementation",
     long_description=__doc__,
@@ -24,7 +24,7 @@ options = dict(
     license="BSD",
     platforms="Any",
     packages=find_packages(),
-    scripts=["webrtc.py"],
+    scripts=["shoRTCut.py"],
     package_data={
         'app': ['static/javascripts/*.js',
                 'static/stylesheets/*.css',

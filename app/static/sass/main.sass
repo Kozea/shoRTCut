@@ -8,13 +8,27 @@ html, body
   align-content: flex-end
   height: 100%
 
-video
-  &.remote
-    flex: 4
+  .localchat
+    display: flex
+    flex-direction: column
+    height: 100%
 
-  &.local
+    .local
+      flex: 1
+
+    .scrollback
+      flex: 1
+
+  video.remote
+    flex: 4 1 100%
+
+  .localchat
     align-self: flex-end
-    flex: 1
+    flex: 1 4 100%
 
   max-height: 720px
   max-width: 1280px
+
+.scrollback
+  max-height: 50%
+  overflow-y: auto

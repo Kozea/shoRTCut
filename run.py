@@ -8,10 +8,10 @@ import sys
 
 
 commands = [
-    'coffee -wcb -j app/static/javascripts/main.js ' +
+    'coffee -wc -o app/static/javascripts/ ' +
     ' '.join(glob('app/static/coffees/*.coffee')),
     'compass watch app/static',
-    'python webrtc.py ' + ' '.join(sys.argv[1:])
+    'python shoRTCut.py ' + ' '.join(sys.argv[1:])
 ]
 
 

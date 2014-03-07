@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2013 by Florian Mounier, Kozea
-# This file is part of webrtc, licensed under a 3-clause BSD license.
+# This file is part of shoRTCut, licensed under a 3-clause BSD license.
 
 import tornado.websocket
 from collections import defaultdict

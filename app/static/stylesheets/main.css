@@ -10,19 +10,35 @@ html, body {
   justify-content: space-between;
   align-content: flex-end;
   height: 100%;
-}
-
-/* line 11, ../sass/main.sass */
-video {
   max-height: 720px;
   max-width: 1280px;
 }
-/* line 12, ../sass/main.sass */
-video.remote {
-  flex: 4;
+/* line 11, ../sass/main.sass */
+.videos .localchat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
-/* line 15, ../sass/main.sass */
-video.local {
-  align-self: flex-end;
+/* line 16, ../sass/main.sass */
+.videos .localchat .local {
   flex: 1;
+}
+/* line 19, ../sass/main.sass */
+.videos .localchat .scrollback {
+  flex: 1;
+}
+/* line 22, ../sass/main.sass */
+.videos video.remote {
+  flex: 4 1 100%;
+}
+/* line 25, ../sass/main.sass */
+.videos .localchat {
+  align-self: flex-end;
+  flex: 1 4 100%;
+}
+
+/* line 32, ../sass/main.sass */
+.scrollback {
+  max-height: 50%;
+  overflow-y: auto;
 }

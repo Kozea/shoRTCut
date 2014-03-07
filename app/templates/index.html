@@ -11,7 +11,7 @@
     <meta name="author" content="Kozea">
     <link rel="shortcut icon" href="{{ static_url('images/favicon.png') }}">
 
-    <title>WebRTC</title>
+    <title>shoRTCut test page</title>
     <link href="{{ static_url('stylesheets/bootstrap/bootstrap.css') }}" rel="stylesheet">
     <link href="{{ static_url('stylesheets/main.css') }}" rel="stylesheet">
     <script>
@@ -20,15 +20,24 @@
   </head>
 
   <body>
+    <header>
+      <h1>shoRTCut</h1>
+    </header>
     <section class="videos">
-        <video class="remote" autoplay></video>
+      <video class="remote" autoplay></video>
+      <section class="localchat">
         <video class="local" autoplay muted="muted"></video>
-    </section>
+        <div class="scrollback">
 
+        </div>
+        <input type="text" disabled name="local"/>
+      </section>
+    </section>
 
     <script src="{{ static_url('javascripts/jquery-1.10.2.min.js') }}"></script>
     <script src="{{ static_url('javascripts/bootstrap.min.js') }}"></script>
     <script src="{{ static_url('javascripts/adapter.js') }}"></script>
+    <script src="{{ static_url('javascripts/shortcut.js') }}"></script>
     <script src="{{ static_url('javascripts/main.js') }}"></script>
   </body>
 </html>

@@ -13,7 +13,7 @@ import os
 
 tornado.options.define("secret", default='secret', help="Secret")
 tornado.options.define("debug", default=False, help="Debug mode")
-tornado.options.define("host", default='webrtc.l', help="Server host")
+tornado.options.define("host", default='shoRTCut.l', help="Server host")
 tornado.options.define("port", default=3615, type=int, help="Server port")
 tornado.options.define("turn_server", default='', help="TURN server")
 tornado.options.define("turn_username", default='', help="TURN username")
@@ -31,12 +31,11 @@ tornado.options.define("ssl_ca",
                            os.path.dirname(__file__), 'server.crt'),
                        help="SSL CA cert file")
 
-host = 'webrtc.l'
 tornado.options.parse_command_line()
 
 import logging
 from logging.handlers import SysLogHandler, SMTPHandler
-log = logging.getLogger('webrtc')
+log = logging.getLogger('shoRTCut')
 
 if not tornado.options.options.debug:
     handler = SysLogHandler(
@@ -44,13 +43,13 @@ if not tornado.options.options.debug:
     handler.setLevel(logging.INFO)
     handler.setFormatter(
         logging.Formatter(
-            'WEBRTC: %(name)s: %(levelname)s %(message)s'))
+            'shoRTCut: %(name)s: %(levelname)s %(message)s'))
 
     smtp_handler = SMTPHandler(
         'smtp.keleos.fr',
         'no-reply@keleos.fr',
-        'webrtc-errors@kozea.fr',
-        'Webrtc Exception')
+        'shoRTCut-errors@kozea.fr',
+        'shoRTCut Exception')
     smtp_handler.setLevel(logging.ERROR)
 
     log.addHandler(handler)

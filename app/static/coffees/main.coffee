@@ -1,104 +1,57 @@
-type = null
-ws = null
-peer = null
-local_stream = null
-servers = []
+# GET adapter.js from https://webrtc.googlecode.com/svn/trunk/samples/js/base/adapter.js
 
-error = (error) ->
-    console.log 'Error', error
+chat = (text) ->
+    $sb = $('.scrollback')
+    $sb.append($('<div>').text(text))
+    $sb.stop(true, true).animate scrollTop: $sb.prop('scrollHeight') - $sb.height()
 
-assign_local_stream = (stream) ->
-    console.log 'Got local stream', stream
-    $('video.local').attr 'src', URL.createObjectURL(stream)
-    local_stream = stream
-    connect()
-    ws.send('READY')
+send = null
 
-connect = ->
-    peer = new RTCPeerConnection
-        iceServers: [
-            createIceServer('stun:stun.l.google.com:19302'),
-            createIceServer('turn:' + options.turn_server + '?transport=udp',
-                options.turn_username,
-                options.turn_password)
-        ]
-    ,
-        optional: [DtlsSrtpKeyAgreement: true]
+class RemoteChannel extends ShoRTCut::Channel
+    constructor: ->
+        super
+        send = @send.bind @
 
-    peer.addStream local_stream
-    peer.onicecandidate = (event) ->
-        console.log 'Got ice', event.candidate
-        return unless event.candidate
-        ws.send 'ICE|' + JSON.stringify(new RTCIceCandidate(event.candidate))
+    open: ->
+        super
+        chat 'Connected'
 
-    peer.onaddstream = (event) ->
-        console.log 'Got remote stream', event.stream
-        $('video.remote').attr 'src', URL.createObjectURL(event.stream)
+    close: ->
+        super
+        chat 'Connection closed.'
 
+class LocalChannel extends ShoRTCut::Channel
+    constructor: ->
+        super
 
+    open: ->
+        super
+        $('input[name=local]').attr('disabled', null).on 'keyup', (e) ->
+            if e.keyCode is 13 and $(this).val()
+                send 'CHAT', $(this).val()
+                chat 'me   < ' + $(this).val()
+                $(this).val('')
 
-ws_message = (event) ->
-    message = event.data
-    pipe = message.indexOf('|')
-    if pipe > -1
-        cmd = message.substr(0, pipe)
-        data = message.substr(pipe + 1)
-    else
-        cmd = message
-        data = ''
+    CHAT: (message) ->
+        chat 'peer > ' + message
 
-    switch cmd
-        when 'ECHO'
-            console.log data
+    close: ->
+        super
+        $('input[name=local]').attr('disabled', 'disabled').off 'keyup'
 
-        when 'INIT'
-            getUserMedia
-                audio: true
-                video: true,
-                assign_local_stream
-                error
+class RTCTest extends ShoRTCut
+    constructor: ->
+        super
+        @LocalChannel = LocalChannel
+        @RemoteChannel = RemoteChannel
 
-        when 'START'
-            console.log 'Creating offer'
-            peer.createOffer (desc) ->
-                console.log 'Local desc', desc
-                peer.setLocalDescription desc
-                ws.send 'CALL|' + JSON.stringify(desc)
-            , error
-            , mandatory:
-                OfferToReceiveAudio: true
-                OfferToReceiveVideo: true
+    assign_local_stream_url: (url) ->
+        $('video.local').attr 'src', url
 
-        when 'CALL'
-            peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(data)))
-            peer.createAnswer (desc) ->
-                console.log 'Local desc', desc
-                peer.setLocalDescription desc
-                ws.send 'ANSWER|' + JSON.stringify(desc)
-            , error
-            , mandatory:
-                OfferToReceiveAudio: true
-                OfferToReceiveVideo: true
-
-        when 'ANSWER'
-            peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(data)))
-
-        when 'ICE'
-            peer.addIceCandidate(new RTCIceCandidate(JSON.parse(data)))
-
-        when 'RESET'
-            peer.close()
-            connect(local_stream)
-
-        when 'WAIT'
-            console.log('WAIT')
-
-        when 'FULL'
-            alert("There's already 2 persons for this uuid")
+    assign_remote_stream_url: (url) ->
+        $('video.remote').attr 'src', url
 
 $ ->
-    ws = new WebSocket 'wss://' + document.location.host + '/ws' + location.pathname
-    ws.onopen = -> console.log "WebSocket open", arguments
-    ws.onclose = -> console.log "WebSocket closed", arguments
-    ws.onerror = -> console.log "WebSocket error", arguments
-    ws.onmessage = ws_message
+    rtctest = new RTCTest()
+    rtctest.start()
+    chat 'Connecting...'

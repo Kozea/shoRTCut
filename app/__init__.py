@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2013 by Florian Mounier, Kozea
-# This file is part of webrtc, licensed under a 3-clause BSD license.
+# This file is part of shoRTCut, licensed under a 3-clause BSD license.
 
 import os
 import tornado.web
@@ -8,7 +8,7 @@ import tornado.options
 import tornado.web
 from logging import getLogger
 
-log = getLogger('webrtc')
+log = getLogger('shoRTCut')
 
 
 application = tornado.web.Application(
