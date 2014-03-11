@@ -9,21 +9,17 @@ shoRTCut - WebRTC Websocket signalling server implementation
 
 from setuptools import find_packages, setup
 
-# Use a time-based version number with ridiculous precision as pip in tox
-# does not reinstall the same version.
-import datetime
-VERSION = "git-" + datetime.datetime.now().isoformat()
 
 options = dict(
     name="shoRTCut",
-    version=VERSION,
+    version='1.0.0',
     description="WebRTC Websocket signalling server implementation",
     long_description=__doc__,
     author="Florian Mounier - Kozea",
     author_email="florian.mounier@kozea.fr",
     license="BSD",
     platforms="Any",
-    packages=find_packages(),
+    packages=['app'],
     scripts=["shoRTCut.py"],
     package_data={
         'app': ['static/javascripts/*.js',
