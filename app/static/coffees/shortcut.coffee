@@ -83,7 +83,7 @@ class WebSocket extends Channel
         @log message
 
     INIT: ->
-        @rtc.init()
+        @rtc.user_media()
 
     START: ->
         @log 'Creating offer'
@@ -110,12 +110,11 @@ class WebSocket extends Channel
         alert("There's already 2 persons for this uuid")
 
 class Peer extends Loggable
-    _local_stream: null
-
     constructor: (@pc, @rtc) ->
         @pc.onicecandidate = @ice_out.bind @
         @pc.onaddstream = @remote_stream.bind @
         @pc.ondatachannel = @data_channel.bind @
+        @pc.addStream @rtc.local_stream
 
     ice_in: (ice) ->
         @pc.addIceCandidate ice
@@ -155,16 +154,6 @@ class Peer extends Loggable
         @log 'Got remote description', desc
         @pc.setRemoteDescription desc
 
-    offer_stream: (stream)->
-        @log 'Offering ', stream
-        @pc.addStream stream
-
-    local_stream: (stream) ->
-        @log 'Got local stream', stream
-        @offer_stream(stream)
-        @rtc.assign_local_stream_url URL.createObjectURL stream
-        Peer::_local_stream = stream
-
     remote_stream: (event) ->
         @log 'Got remote stream', event.stream
         @rtc.assign_remote_stream_url URL.createObjectURL event.stream
@@ -180,17 +169,6 @@ class Peer extends Loggable
         @log 'Got local channel'
         @local_chat_channel = new @rtc.LocalChatChannel @pc.createDataChannel 'Chat'
         @local_file_channel = new @rtc.LocalFileChannel @pc.createDataChannel 'File'
-
-    make_stream: ->
-        @log 'Getting user media'
-        if Peer::_local_stream
-            @offer_stream Peer::_local_stream
-        else
-            getUserMedia
-                audio: true
-                video: true,
-                @local_stream.bind(@),
-                @error.bind(@)
 
     quit: ->
         @remote_chat_channel?.quit()
@@ -216,9 +194,21 @@ class ShoRTCut extends Loggable
     start: ->
         @ws = new @WebSocket new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), @
 
-    init: ->
+    user_media: ->
+        @log 'Getting user media'
+        window.getUserMedia
+            audio: true
+            video: true,
+            @init.bind(@)
+            @error.bind(@)
+
+    init: (stream) ->
+        @log 'Assigning local stream', stream
+        @assign_local_stream_url URL.createObjectURL stream
+        @local_stream = stream
         @log 'Connecting'
         @connect()
+        @ws.send 'READY'
 
     calling: (desc) ->
         @ws.send 'CALL', desc
@@ -235,9 +225,7 @@ class ShoRTCut extends Loggable
                     options.turn_password)
             ],
             optional: [DtlsSrtpKeyAgreement: true]), @)
-        @peer.make_stream()
         @peer.make_channel()
-        @ws.send 'READY'
 
     ice_out: (ice) ->
         @ws.send 'ICE', ice

@@ -131,7 +131,7 @@
     };
 
     WebSocket.prototype.INIT = function() {
-      return this.rtc.init();
+      return this.rtc.user_media();
     };
 
     WebSocket.prototype.START = function() {
@@ -171,14 +171,13 @@
   Peer = (function(_super) {
     __extends(Peer, _super);
 
-    Peer.prototype._local_stream = null;
-
     function Peer(pc, rtc) {
       this.pc = pc;
       this.rtc = rtc;
       this.pc.onicecandidate = this.ice_out.bind(this);
       this.pc.onaddstream = this.remote_stream.bind(this);
       this.pc.ondatachannel = this.data_channel.bind(this);
+      this.pc.addStream(this.rtc.local_stream);
     }
 
     Peer.prototype.ice_in = function(ice) {
@@ -232,18 +231,6 @@
       return this.pc.setRemoteDescription(desc);
     };
 
-    Peer.prototype.offer_stream = function(stream) {
-      this.log('Offering ', stream);
-      return this.pc.addStream(stream);
-    };
-
-    Peer.prototype.local_stream = function(stream) {
-      this.log('Got local stream', stream);
-      this.offer_stream(stream);
-      this.rtc.assign_local_stream_url(URL.createObjectURL(stream));
-      return Peer.prototype._local_stream = stream;
-    };
-
     Peer.prototype.remote_stream = function(event) {
       this.log('Got remote stream', event.stream);
       return this.rtc.assign_remote_stream_url(URL.createObjectURL(event.stream));
@@ -263,18 +250,6 @@
       this.log('Got local channel');
       this.local_chat_channel = new this.rtc.LocalChatChannel(this.pc.createDataChannel('Chat'));
       return this.local_file_channel = new this.rtc.LocalFileChannel(this.pc.createDataChannel('File'));
-    };
-
-    Peer.prototype.make_stream = function() {
-      this.log('Getting user media');
-      if (Peer.prototype._local_stream) {
-        return this.offer_stream(Peer.prototype._local_stream);
-      } else {
-        return getUserMedia({
-          audio: true,
-          video: true
-        }, this.local_stream.bind(this), this.error.bind(this));
-      }
     };
 
     Peer.prototype.quit = function() {
@@ -321,9 +296,21 @@
       return this.ws = new this.WebSocket(new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), this);
     };
 
-    ShoRTCut.prototype.init = function() {
+    ShoRTCut.prototype.user_media = function() {
+      this.log('Getting user media');
+      return window.getUserMedia({
+        audio: true,
+        video: true
+      }, this.init.bind(this), this.error.bind(this));
+    };
+
+    ShoRTCut.prototype.init = function(stream) {
+      this.log('Assigning local stream', stream);
+      this.assign_local_stream_url(URL.createObjectURL(stream));
+      this.local_stream = stream;
       this.log('Connecting');
-      return this.connect();
+      this.connect();
+      return this.ws.send('READY');
     };
 
     ShoRTCut.prototype.calling = function(desc) {
@@ -343,9 +330,7 @@
           }
         ]
       }), this);
-      this.peer.make_stream();
-      this.peer.make_channel();
-      return this.ws.send('READY');
+      return this.peer.make_channel();
     };
 
     ShoRTCut.prototype.ice_out = function(ice) {
