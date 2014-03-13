@@ -22,10 +22,11 @@
 
     Loggable.prototype.error = function() {
       if (typeof console !== "undefined" && console !== null ? console.error : void 0) {
-        return console.error.apply(console, arguments);
+        console.error.apply(console, arguments);
       } else {
-        return alert(arguments[0]);
+        alert(arguments[0]);
       }
+      return window.last_err_args = arguments;
     };
 
     return Loggable;
@@ -64,30 +65,46 @@
     };
 
     Channel.prototype.send = function(cmd, data) {
-      var message;
-      if (data) {
-        message = "" + cmd + "|" + data;
+      var message, type;
+      type = cmd.constructor.name;
+      if (type === 'String') {
+        if (data) {
+          message = "" + cmd + "|" + data;
+        } else {
+          message = cmd;
+        }
+        this.log('Sending', message);
+        return this.ch.send(message);
       } else {
-        message = cmd;
+        this.log('Sending', cmd);
+        return this.ch.send(cmd);
       }
-      this.log('Sending', message);
-      return this.ch.send(message);
     };
 
     Channel.prototype.message = function(e) {
-      var cmd, data, message, pipe;
+      var cmd, data, message, pipe, type;
+      if (!e.data) {
+        this.log('Empty message');
+        return;
+      }
       message = e.data;
       this.log('Receiving', message);
-      pipe = message.indexOf('|');
-      if (pipe > -1) {
-        cmd = message.substr(0, pipe);
-        data = message.substr(pipe + 1);
+      type = message.constructor.name;
+      if (type === 'String') {
+        pipe = message.indexOf('|');
+        if (pipe > -1) {
+          cmd = message.substr(0, pipe);
+          data = message.substr(pipe + 1);
+        } else {
+          cmd = message;
+          data = '';
+        }
       } else {
-        cmd = message;
-        data = '';
+        cmd = 'BINARY';
+        data = message;
       }
       if (!(cmd in this)) {
-        return this.error("Unknown command " + cmd);
+        return this.error("Unknown command " + cmd, type, message);
       } else {
         return this[cmd](data);
       }
@@ -114,17 +131,19 @@
     };
 
     WebSocket.prototype.INIT = function() {
-      return this.rtc.user_media();
+      return this.rtc.init();
     };
 
     WebSocket.prototype.START = function() {
       this.log('Creating offer');
-      return this.rtc.peer.offering();
+      this.rtc.peer.offering();
+      return this.rtc.caller();
     };
 
     WebSocket.prototype.CALL = function(message) {
       this.rtc.peer.remote_description(new RTCSessionDescription(JSON.parse(message)));
-      return this.rtc.peer.answering();
+      this.rtc.peer.answering();
+      return this.rtc.callee();
     };
 
     WebSocket.prototype.ANSWER = function(message) {
@@ -152,13 +171,14 @@
   Peer = (function(_super) {
     __extends(Peer, _super);
 
+    Peer.prototype._local_stream = null;
+
     function Peer(pc, rtc) {
       this.pc = pc;
       this.rtc = rtc;
       this.pc.onicecandidate = this.ice_out.bind(this);
-      this.pc.onaddstream = this.stream.bind(this);
+      this.pc.onaddstream = this.remote_stream.bind(this);
       this.pc.ondatachannel = this.data_channel.bind(this);
-      this.pc.addStream(this.rtc.local_stream);
     }
 
     Peer.prototype.ice_in = function(ice) {
@@ -212,28 +232,64 @@
       return this.pc.setRemoteDescription(desc);
     };
 
-    Peer.prototype.stream = function(event) {
+    Peer.prototype.offer_stream = function(stream) {
+      this.log('Offering ', stream);
+      return this.pc.addStream(stream);
+    };
+
+    Peer.prototype.local_stream = function(stream) {
+      this.log('Got local stream', stream);
+      this.offer_stream(stream);
+      this.rtc.assign_local_stream_url(URL.createObjectURL(stream));
+      return Peer.prototype._local_stream = stream;
+    };
+
+    Peer.prototype.remote_stream = function(event) {
       this.log('Got remote stream', event.stream);
       return this.rtc.assign_remote_stream_url(URL.createObjectURL(event.stream));
     };
 
     Peer.prototype.data_channel = function(event) {
       this.log('Got remote channel', event.channel);
-      return this.remote_channel = new this.rtc.RemoteChannel(event.channel);
+      if (event.channel.label === 'Chat') {
+        this.remote_chat_channel = new this.rtc.RemoteChatChannel(event.channel);
+      }
+      if (event.channel.label === 'File') {
+        return this.remote_file_channel = new this.rtc.RemoteFileChannel(event.channel);
+      }
     };
 
     Peer.prototype.make_channel = function() {
       this.log('Got local channel');
-      return this.local_channel = new this.rtc.LocalChannel(this.pc.createDataChannel(Math.random.toString()));
+      this.local_chat_channel = new this.rtc.LocalChatChannel(this.pc.createDataChannel('Chat'));
+      return this.local_file_channel = new this.rtc.LocalFileChannel(this.pc.createDataChannel('File'));
+    };
+
+    Peer.prototype.make_stream = function() {
+      this.log('Getting user media');
+      if (Peer.prototype._local_stream) {
+        return this.offer_stream(Peer.prototype._local_stream);
+      } else {
+        return getUserMedia({
+          audio: true,
+          video: true
+        }, this.local_stream.bind(this), this.error.bind(this));
+      }
     };
 
     Peer.prototype.quit = function() {
-      var _ref1, _ref2;
-      if ((_ref1 = this.remote_channel) != null) {
+      var _ref1, _ref2, _ref3, _ref4;
+      if ((_ref1 = this.remote_chat_channel) != null) {
         _ref1.quit();
       }
-      if ((_ref2 = this.local_channel) != null) {
+      if ((_ref2 = this.remote_file_channel) != null) {
         _ref2.quit();
+      }
+      if ((_ref3 = this.local_chat_channel) != null) {
+        _ref3.quit();
+      }
+      if ((_ref4 = this.local_file_channel) != null) {
+        _ref4.quit();
       }
       return this.pc.close();
     };
@@ -254,8 +310,10 @@
     function ShoRTCut(options) {
       this.options = options;
       this.Peer = Peer;
-      this.LocalChannel = Channel;
-      this.RemoteChannel = Channel;
+      this.LocalChatChannel = Channel;
+      this.LocalFileChannel = Channel;
+      this.RemoteChatChannel = Channel;
+      this.RemoteFileChannel = Channel;
       this.WebSocket = WebSocket;
     }
 
@@ -263,21 +321,9 @@
       return this.ws = new this.WebSocket(new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), this);
     };
 
-    ShoRTCut.prototype.user_media = function() {
-      this.log('Getting user media');
-      return window.getUserMedia({
-        audio: true,
-        video: true
-      }, this.init.bind(this), this.error.bind(this));
-    };
-
-    ShoRTCut.prototype.init = function(stream) {
-      this.log('Assigning local stream', stream);
-      this.assign_local_stream_url(URL.createObjectURL(stream));
-      this.local_stream = stream;
+    ShoRTCut.prototype.init = function() {
       this.log('Connecting');
-      this.connect();
-      return this.ws.send('READY');
+      return this.connect();
     };
 
     ShoRTCut.prototype.calling = function(desc) {
@@ -297,7 +343,9 @@
           }
         ]
       }), this);
-      return this.peer.make_channel();
+      this.peer.make_stream();
+      this.peer.make_channel();
+      return this.ws.send('READY');
     };
 
     ShoRTCut.prototype.ice_out = function(ice) {
@@ -320,6 +368,10 @@
     ShoRTCut.prototype.assign_remote_stream_url = function(url) {
       return this.error('You must override this method to set remote stream url');
     };
+
+    ShoRTCut.prototype.caller = function() {};
+
+    ShoRTCut.prototype.callee = function() {};
 
     return ShoRTCut;
 

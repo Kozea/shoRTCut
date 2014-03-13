@@ -29,6 +29,29 @@ html, body
   max-height: 720px
   max-width: 1280px
 
+.filedrop
+  transition: 500ms
+  border: 2px dashed #eee
+  margin: .5em
+  padding: 2em
+  text-align: center
+  font-size: 2em
+  color: #eee
+
+  &.hover
+    background-color: #fff4f4
+    color: #faa
+    border-color: #faa
+
+  &.active
+    color: #aaa
+    border-color: #aaa
+
+    &.hover
+      background-color: #f4f4ff
+      color: #aaf
+      border-color: #aaf
+
 .scrollback
   max-height: 50%
   overflow-y: auto

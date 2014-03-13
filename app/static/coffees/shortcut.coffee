@@ -13,6 +13,7 @@ class Loggable
             console.error.apply console, arguments
         else
             alert arguments[0]
+        window.last_err_args = arguments
 
 
 class Channel extends Loggable
@@ -36,25 +37,40 @@ class Channel extends Loggable
         @error.apply @, log_args
 
     send: (cmd, data) ->
-        if data
-            message = "#{cmd}|#{data}"
+        type = cmd.constructor.name
+        if type is 'String'
+            if data
+                message = "#{cmd}|#{data}"
+            else
+                message = cmd
+            @log 'Sending', message
+            @ch.send message
         else
-            message = cmd
-        @log 'Sending', message
-        @ch.send message
+            @log 'Sending', cmd
+            @ch.send cmd
 
     message: (e) ->
+        unless e.data
+            @log 'Empty message'
+            return
         message = e.data
         @log 'Receiving', message
-        pipe = message.indexOf('|')
-        if pipe > -1
-            cmd = message.substr(0, pipe)
-            data = message.substr(pipe + 1)
+
+        type = message.constructor.name
+        if type is 'String'
+            pipe = message.indexOf('|')
+            if pipe > -1
+                cmd = message.substr(0, pipe)
+                data = message.substr(pipe + 1)
+            else
+                cmd = message
+                data = ''
         else
-            cmd = message
-            data = ''
+            cmd = 'BINARY'
+            data = message
+
         if cmd not of @
-            @error "Unknown command #{cmd}"
+            @error "Unknown command #{cmd}", type, message
         else
             @[cmd](data)
 
@@ -67,15 +83,17 @@ class WebSocket extends Channel
         @log message
 
     INIT: ->
-        @rtc.user_media()
+        @rtc.init()
 
     START: ->
         @log 'Creating offer'
         @rtc.peer.offering()
+        @rtc.caller()
 
     CALL: (message) ->
         @rtc.peer.remote_description new RTCSessionDescription JSON.parse message
         @rtc.peer.answering()
+        @rtc.callee()
 
     ANSWER: (message) ->
         @rtc.peer.remote_description new RTCSessionDescription JSON.parse message
@@ -92,11 +110,12 @@ class WebSocket extends Channel
         alert("There's already 2 persons for this uuid")
 
 class Peer extends Loggable
+    _local_stream: null
+
     constructor: (@pc, @rtc) ->
         @pc.onicecandidate = @ice_out.bind @
-        @pc.onaddstream = @stream.bind @
+        @pc.onaddstream = @remote_stream.bind @
         @pc.ondatachannel = @data_channel.bind @
-        @pc.addStream @rtc.local_stream
 
     ice_in: (ice) ->
         @pc.addIceCandidate ice
@@ -136,21 +155,48 @@ class Peer extends Loggable
         @log 'Got remote description', desc
         @pc.setRemoteDescription desc
 
-    stream: (event) ->
+    offer_stream: (stream)->
+        @log 'Offering ', stream
+        @pc.addStream stream
+
+    local_stream: (stream) ->
+        @log 'Got local stream', stream
+        @offer_stream(stream)
+        @rtc.assign_local_stream_url URL.createObjectURL stream
+        Peer::_local_stream = stream
+
+    remote_stream: (event) ->
         @log 'Got remote stream', event.stream
-        @rtc.assign_remote_stream_url URL.createObjectURL(event.stream)
+        @rtc.assign_remote_stream_url URL.createObjectURL event.stream
 
     data_channel: (event) ->
         @log 'Got remote channel', event.channel
-        @remote_channel = new @rtc.RemoteChannel event.channel
+        if event.channel.label is 'Chat'
+            @remote_chat_channel = new @rtc.RemoteChatChannel event.channel
+        if event.channel.label is 'File'
+            @remote_file_channel = new @rtc.RemoteFileChannel event.channel
 
     make_channel: ->
         @log 'Got local channel'
-        @local_channel = new @rtc.LocalChannel @pc.createDataChannel Math.random.toString()
+        @local_chat_channel = new @rtc.LocalChatChannel @pc.createDataChannel 'Chat'
+        @local_file_channel = new @rtc.LocalFileChannel @pc.createDataChannel 'File'
+
+    make_stream: ->
+        @log 'Getting user media'
+        if Peer::_local_stream
+            @offer_stream Peer::_local_stream
+        else
+            getUserMedia
+                audio: true
+                video: true,
+                @local_stream.bind(@),
+                @error.bind(@)
 
     quit: ->
-        @remote_channel?.quit()
-        @local_channel?.quit()
+        @remote_chat_channel?.quit()
+        @remote_file_channel?.quit()
+        @local_chat_channel?.quit()
+        @local_file_channel?.quit()
         @pc.close()
 
 
@@ -161,28 +207,18 @@ class ShoRTCut extends Loggable
 
     constructor: (@options) ->
         @Peer = Peer
-        @LocalChannel = Channel
-        @RemoteChannel = Channel
+        @LocalChatChannel = Channel
+        @LocalFileChannel = Channel
+        @RemoteChatChannel = Channel
+        @RemoteFileChannel = Channel
         @WebSocket = WebSocket
 
     start: ->
         @ws = new @WebSocket new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), @
 
-    user_media: ->
-        @log 'Getting user media'
-        window.getUserMedia
-            audio: true
-            video: true,
-            @init.bind(@)
-            @error.bind(@)
-
-    init: (stream) ->
-        @log 'Assigning local stream', stream
-        @assign_local_stream_url URL.createObjectURL stream
-        @local_stream = stream
+    init: ->
         @log 'Connecting'
         @connect()
-        @ws.send 'READY'
 
     calling: (desc) ->
         @ws.send 'CALL', desc
@@ -199,7 +235,9 @@ class ShoRTCut extends Loggable
                     options.turn_password)
             ],
             optional: [DtlsSrtpKeyAgreement: true]), @)
+        @peer.make_stream()
         @peer.make_channel()
+        @ws.send 'READY'
 
     ice_out: (ice) ->
         @ws.send 'ICE', ice
@@ -217,6 +255,11 @@ class ShoRTCut extends Loggable
 
     assign_remote_stream_url: (url) ->
         @error 'You must override this method to set remote stream url'
+
+    # Specific code caller/callee
+    caller: ->
+
+    callee: ->
 
 # exports
 @ShoRTCut = ShoRTCut

@@ -38,6 +38,34 @@ html, body {
 }
 
 /* line 32, ../sass/main.sass */
+.filedrop {
+  transition: 500ms;
+  border: 2px dashed #eeeeee;
+  margin: 0.5em;
+  padding: 2em;
+  text-align: center;
+  font-size: 2em;
+  color: #eeeeee;
+}
+/* line 41, ../sass/main.sass */
+.filedrop.hover {
+  background-color: #fff4f4;
+  color: #ffaaaa;
+  border-color: #ffaaaa;
+}
+/* line 46, ../sass/main.sass */
+.filedrop.active {
+  color: #aaaaaa;
+  border-color: #aaaaaa;
+}
+/* line 50, ../sass/main.sass */
+.filedrop.active.hover {
+  background-color: #f4f4ff;
+  color: #aaaaff;
+  border-color: #aaaaff;
+}
+
+/* line 55, ../sass/main.sass */
 .scrollback {
   max-height: 50%;
   overflow-y: auto;
