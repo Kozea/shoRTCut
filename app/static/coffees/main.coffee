@@ -1,7 +1,7 @@
 # GET adapter.js from https://webrtc.googlecode.com/svn/trunk/samples/js/base/adapter.js
 rfs = window.requestFileSystem || window.webkitRequestFileSystem
 chunk_size = 16000
-flush_length = 256000 / chunk_size
+flush_length = 16
 
 chunks = (size, chunk) ->
     for i in [0..size] by chunk
@@ -173,11 +173,19 @@ class FileReceiver extends ShoRTCut::Loggable
         @parts = []
         @length = 0
         @callbacks = []
+        @entry.createWriter(
+            (fw) =>
+                @fw = fw
+                @fw.onwriteend = =>
+                    @flushing = false
+                    if @callbacks.length
+                        @callbacks.shift()()
+            ,
+            @error.bind(@))
 
     add: (part) ->
         @parts.push part
         @length += part.byteLength
-        @$progress.val(@length)
         if @parts.length >= flush_length or @length >= @size
             if @flushing
                 parts = @parts
@@ -193,21 +201,12 @@ class FileReceiver extends ShoRTCut::Loggable
 
     flush: (parts) ->
         return unless parts.length
-
         if @flushing
             @error("Can't flush, already flushing")
         @flushing = true
-        blob = new Blob parts, type: @type
-        @entry.createWriter(
-            (fw) =>
-                fw.onwriteend = =>
-                    @flushing = false
-                    if @callbacks.length
-                        @callbacks.shift()()
-                fw.seek(fw.length)
-                fw.write(blob)
-            ,
-            @error.bind(@))
+        @$progress.val(@length)
+        @fw.seek @fw.length
+        @fw.write new Blob parts, type: @type
 
     url: ->
         @entry.toURL()

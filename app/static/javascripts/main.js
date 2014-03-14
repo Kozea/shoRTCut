@@ -9,7 +9,7 @@
 
   chunk_size = 16000;
 
-  flush_length = 256000 / chunk_size;
+  flush_length = 16;
 
   chunks = function(size, chunk) {
     var i, _i, _results;
@@ -221,6 +221,7 @@
     __extends(FileReceiver, _super);
 
     function FileReceiver(entry, name, size, type, end, $progress) {
+      var _this = this;
       this.entry = entry;
       this.name = name;
       this.size = size;
@@ -231,6 +232,15 @@
       this.parts = [];
       this.length = 0;
       this.callbacks = [];
+      this.entry.createWriter(function(fw) {
+        _this.fw = fw;
+        return _this.fw.onwriteend = function() {
+          _this.flushing = false;
+          if (_this.callbacks.length) {
+            return _this.callbacks.shift()();
+          }
+        };
+      }, this.error.bind(this));
     }
 
     FileReceiver.prototype.add = function(part) {
@@ -238,7 +248,6 @@
         _this = this;
       this.parts.push(part);
       this.length += part.byteLength;
-      this.$progress.val(this.length);
       if (this.parts.length >= flush_length || this.length >= this.size) {
         if (this.flushing) {
           parts = this.parts;
@@ -257,8 +266,6 @@
     };
 
     FileReceiver.prototype.flush = function(parts) {
-      var blob,
-        _this = this;
       if (!parts.length) {
         return;
       }
@@ -266,19 +273,11 @@
         this.error("Can't flush, already flushing");
       }
       this.flushing = true;
-      blob = new Blob(parts, {
+      this.$progress.val(this.length);
+      this.fw.seek(this.fw.length);
+      return this.fw.write(new Blob(parts, {
         type: this.type
-      });
-      return this.entry.createWriter(function(fw) {
-        fw.onwriteend = function() {
-          _this.flushing = false;
-          if (_this.callbacks.length) {
-            return _this.callbacks.shift()();
-          }
-        };
-        fw.seek(fw.length);
-        return fw.write(blob);
-      }, this.error.bind(this));
+      }));
     };
 
     FileReceiver.prototype.url = function() {
