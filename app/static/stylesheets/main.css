@@ -70,3 +70,20 @@ html, body {
   max-height: 50%;
   overflow-y: auto;
 }
+
+/* line 59, ../sass/main.sass */
+.progresses {
+  width: 100%;
+}
+/* line 62, ../sass/main.sass */
+.progresses tr td:first-child {
+  white-space: pre;
+}
+/* line 65, ../sass/main.sass */
+.progresses tr td:last-child {
+  width: 100%;
+}
+/* line 67, ../sass/main.sass */
+.progresses tr td:last-child progress {
+  width: 100%;
+}

@@ -4,7 +4,7 @@ debug = options?.debug
 class Loggable
     log: ->
         if debug
-            name = (if @ch? then @ch else @).constructor.name
+            name = @constructor.name
             log_args = [name].concat Array.prototype.slice.call(arguments, 0)
             console.log.apply console, log_args
 
@@ -46,37 +46,57 @@ class Channel extends Loggable
             @log 'Sending', message
             @ch.send message
         else
-            @log 'Sending', cmd
             @ch.send cmd
 
     message: (e) ->
         unless e.data
             @log 'Empty message'
             return
-        message = e.data
-        @log 'Receiving', message
 
-        type = message.constructor.name
-        if type is 'String'
-            pipe = message.indexOf('|')
-            if pipe > -1
-                cmd = message.substr(0, pipe)
-                data = message.substr(pipe + 1)
-            else
-                cmd = message
-                data = ''
+        message = e.data
+
+        @log 'Receiving', message
+        pipe = message.indexOf('|')
+        if pipe > -1
+            cmd = message.substr(0, pipe)
+            data = message.substr(pipe + 1)
         else
-            cmd = 'BINARY'
-            data = message
+            cmd = message
+            data = ''
 
         if cmd not of @
-            @error "Unknown command #{cmd}", type, message
+            @error "Unknown command #{cmd}", message
         else
             @[cmd](data)
 
     quit: ->
         @ch.close()
 
+
+class TextChannel extends Channel
+
+class BinaryChannel extends Channel
+    constructor: (@ch, @rtc) ->
+        @ch.binaryType = 'arraybuffer'
+        super(@ch, @rtc)
+        @sendBuffer = []
+
+    message: (e) ->
+        if e.data is "\x02"
+            @log 'Start of text ?!'
+        else
+            @binary(e.data)
+
+    send: (ab) ->
+        if ab
+            @sendBuffer.push ab
+
+        try
+            _ab = @sendBuffer.shift()
+            @ch.send _ab
+        catch
+            @sendBuffer.unshift _ab
+            setTimeout @send.bind(@), 100
 
 class WebSocket extends Channel
     ECHO: (message) ->
@@ -160,36 +180,42 @@ class Peer extends Loggable
 
     data_channel: (event) ->
         @log 'Got remote channel', event.channel
-        if event.channel.label is 'Chat'
-            @remote_chat_channel = new @rtc.RemoteChatChannel event.channel
-        if event.channel.label is 'File'
-            @remote_file_channel = new @rtc.RemoteFileChannel event.channel
+        if event.channel.label is 'text'
+            @remote_text_channel = new @rtc.RemoteTextChannel event.channel
+        if event.channel.label is 'binary'
+            @remote_binary_channel = new @rtc.RemoteBinaryChannel event.channel
 
     make_channel: ->
         @log 'Got local channel'
-        @local_chat_channel = new @rtc.LocalChatChannel @pc.createDataChannel 'Chat'
-        @local_file_channel = new @rtc.LocalFileChannel @pc.createDataChannel 'File'
+        @local_text_channel = new @rtc.LocalTextChannel @pc.createDataChannel 'text', {}
+        @local_binary_channel = new @rtc.LocalBinaryChannel @pc.createDataChannel 'binary', {}
 
     quit: ->
-        @remote_chat_channel?.quit()
-        @remote_file_channel?.quit()
-        @local_chat_channel?.quit()
-        @local_file_channel?.quit()
+        @remote_text_channel?.quit()
+        @remote_binary_channel?.quit()
+        @local_text_channel?.quit()
+        @local_binary_channel?.quit()
         @pc.close()
 
 
 class ShoRTCut extends Loggable
-    Peer: Peer
+    Loggable: Loggable
+
     Channel: Channel
+    Peer: Peer
+    TextChannel: Channel
+    BinaryChannel: BinaryChannel
     WebSocket: WebSocket
 
     constructor: (@options) ->
         @Peer = Peer
-        @LocalChatChannel = Channel
-        @LocalFileChannel = Channel
-        @RemoteChatChannel = Channel
-        @RemoteFileChannel = Channel
         @WebSocket = WebSocket
+
+        @LocalTextChannel = TextChannel
+        @RemoteTextChannel = TextChannel
+
+        @LocalBinaryChannel = BinaryChannel
+        @RemoteBinaryChannel = BinaryChannel
 
     start: ->
         @ws = new @WebSocket new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), @

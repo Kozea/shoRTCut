@@ -1,4 +1,8 @@
 # GET adapter.js from https://webrtc.googlecode.com/svn/trunk/samples/js/base/adapter.js
+rfs = window.requestFileSystem || window.webkitRequestFileSystem
+chunk_size = 16000
+flush_length = 256000 / chunk_size
+
 chunks = (size, chunk) ->
     for i in [0..size] by chunk
         [i, Math.min(i + chunk, size)]
@@ -11,8 +15,20 @@ chat = (text, type='text') ->
 
 chat_send = null
 file_send = null
+file_receiver = null
+files = []
 
-class RemoteChatChannel extends ShoRTCut::Channel
+bytes = (size) ->
+    i = -1
+    byteUnits = [" kB", " MB", " GB", " TB", "PB", "EB", "ZB", "YB"]
+    loop
+        size /= 1000
+        i++
+        break unless size > 1000
+    Math.max(size, 0.1).toFixed(1) + byteUnits[i]
+
+
+class RemoteTextChannel extends ShoRTCut::TextChannel
     constructor: ->
         super
         chat_send = @send.bind @
@@ -25,7 +41,7 @@ class RemoteChatChannel extends ShoRTCut::Channel
         super
         chat 'Chat Connection closed.'
 
-class LocalChatChannel extends ShoRTCut::Channel
+class LocalTextChannel extends ShoRTCut::TextChannel
     constructor: ->
         super
 
@@ -42,6 +58,94 @@ class LocalChatChannel extends ShoRTCut::Channel
     CHAT: (message) ->
         chat 'peer > ' + message
 
+    ACK: ->
+        return unless files.length
+        file = files[0]
+        chat_send "FILE|#{file.size},#{file.type},#{file.name}"
+
+    ACCEPT: ->
+        return unless files.length
+        file = files.shift()
+
+        slices = chunks(file.size, chunk_size)
+        len = slices.length
+        console.log('sending ', slices.length)
+        if file_reader
+            console.error('Parallel read')
+            return
+
+        $('.progresses').append(
+            $('<tr>')
+                .append(
+                    $('<td>').text("Sending #{file.name}"),
+                    $('<td>').append($progress = $('<progress>', max: 100))))
+
+        file_reader = new FileReader()
+        file_reader.onload = (e) ->
+            file_send e.target.result
+            read()
+        do read = ->
+            slice = slices.shift()
+            $progress.val(100 * (len - slices.length) / len)
+            if slice
+                [start, end] = slice
+                file_reader.readAsArrayBuffer file.slice start, end
+            else
+                chat "File sent."
+                file_send new ArrayBuffer(0)
+                false
+
+
+    FILE: (message) ->
+        args = message.split(',')
+        size = +args.shift()
+        type = args.shift()
+        name = args.join ','
+        end = ->
+            chat("peer > File: <a href=\"#{file_receiver.url()}\" download=\"#{file_receiver.name}\">#{file_receiver.name}</a>", 'html')
+            chat_send 'CHAT', "File received ! (received #{bytes file_receiver.size})"
+            file_receiver = null
+            chat_send 'ACK'
+
+        $('.progresses').append(
+            $('<tr>')
+                .append(
+                    $('<td>').text("Receiving #{name}"),
+                    $('<td>').append($progress = $('<progress>', max: size))))
+
+        if rfs
+            rfs(
+                TEMPORARY,
+                size,
+                (fs) =>
+                    chat "Receiving file #{name} #{bytes size}"
+                    get_file = =>
+                        fs.root.getFile(
+                            name,
+                            create: true
+                            exclusive: true,
+                            (entry) =>
+                                file_receiver = new FileReceiver entry, name, size, type, end, $progress
+                                chat_send "ACCEPT"
+                            ,
+                            @error.bind(@))
+                    fs.root.getFile(
+                        name,
+                        create: false,
+                        (entry) =>
+                            console.log "Removing existing temp file #{name}"
+                            entry.remove(
+                                get_file,
+                                @error.bind(@))
+                        ,
+                        get_file)
+                ,
+                @error.bind(@))
+        else
+            chat "Receiving file #{name} #{bytes size}"
+            file_receiver = new FileBuilder name, size, type, end, $progress
+            chat_send "ACCEPT"
+
     close: ->
         super
         $('input[name=local]')
@@ -49,7 +153,7 @@ class LocalChatChannel extends ShoRTCut::Channel
             .off('keyup')
 
 
-class RemoteFileChannel extends ShoRTCut::Channel
+class RemoteBinaryChannel extends ShoRTCut::BinaryChannel
     constructor: ->
         super
         file_send = @send.bind @
@@ -63,17 +167,71 @@ class RemoteFileChannel extends ShoRTCut::Channel
         chat 'File Connection closed.'
 
 
-class FileBuilder
-    constructor: (@name, @type) ->
+class FileReceiver extends ShoRTCut::Loggable
+    constructor: (@entry, @name, @size, @type, @end, @$progress) ->
+        @flushing = false
         @parts = []
+        @length = 0
+        @callbacks = []
 
-    append: (part) ->
+    add: (part) ->
         @parts.push part
+        @length += part.byteLength
+        @$progress.val(@length)
+        if @parts.length >= flush_length or @length >= @size
+            if @flushing
+                parts = @parts
+                @callbacks.push => @flush(parts)
+
+            if @length >= @size
+                @callbacks.push @end
+
+            unless @flushing
+                @flush(@parts)
+
+             @parts = []
+
+    flush: (parts) ->
+        return unless parts.length
+
+        if @flushing
+            @error("Can't flush, already flushing")
+        @flushing = true
+        blob = new Blob parts, type: @type
+        @entry.createWriter(
+            (fw) =>
+                fw.onwriteend = =>
+                    @flushing = false
+                    if @callbacks.length
+                        @callbacks.shift()()
+                fw.seek(fw.length)
+                fw.write(blob)
+            ,
+            @error.bind(@))
+
+    url: ->
+        @entry.toURL()
+
+
+class FileBuilder extends ShoRTCut::Loggable
+    constructor: (@name, @size, @type, @end, @$progress) ->
+        @parts = []
+        @length = 0
+        @expected = Math.ceil(@size / chunk_size)
+        console.log 'expecting ', @expected
+
+    add: (part) ->
+        @parts.push part
+        @length += part.byteLength
+        @$progress.val(@length)
+        if @length >= @size
+            @end()
 
     url: ->
         URL.createObjectURL new Blob @parts, type: @type
 
-class LocalFileChannel extends ShoRTCut::Channel
+
+class LocalBinaryChannel extends ShoRTCut::BinaryChannel
     constructor: ->
         super
 
@@ -90,52 +248,21 @@ class LocalFileChannel extends ShoRTCut::Channel
                 false
             .on 'dragleave', (e) ->
                 $(this).removeClass('hover')
-            .on 'drop', (e) ->
-                $(this).removeClass('hover')
+            .on 'drop', (e) =>
+                $('.filedrop').removeClass('hover')
                 e = e.originalEvent
                 e.stopPropagation()
                 e.preventDefault()
-                return unless $(this).hasClass('active')
-                files = e.dataTransfer.files
-                file = files[0]
-                slices = chunks(file.size, 1024 * 10)
-                # Rewrite when blob is supported through datachannel
-                file_send "FILE|#{file.size},#{file.type},#{slices.length},#{file.name}"
-                file_reader = new FileReader()
-                file_reader.onload = (e) ->
-                    file_send e.target.result
-                    read()
-                do read = ->
-                    slice = slices.shift()
-                    if slice
-                        [start, end] = slice
-                        file_reader.readAsArrayBuffer file.slice start, end
-                    else
-                        file_send "DONE"
+                for file in e.dataTransfer.files
+                    unless file in files
+                        files.push file
+                if files.length
+                    file = files[0]
+                    chat_send "FILE|#{file.size},#{file.type},#{file.name}"
                 false
 
-    FILE: (message) ->
-        return unless $('.filedrop').hasClass('active')
-        $(this).removeClass('active')
-        if @file_builder
-            @error 'Already receiving', @file_builder
-            return
-        args = message.split(',')
-        size = args.shift()
-        type = args.shift()
-        len = args.shift()
-        name = args.join ','
-        chat "Receiving file #{name} of size #{size} (#{len} parts expected)"
-        @file_builder = new FileBuilder name, type
-
-    BINARY: (message) ->
-        @file_builder.append message
-
-    DONE: ->
-        chat("peer > File: <a href=\"#{@file_builder.url()}\" download=\"#{@file_builder.name}\">#{@file_builder.name}</a>", 'html')
-        chat_send 'CHAT', 'File sent !'
-        $('.filedrop').addClass('active')
-        @file_builder = null
+    binary: (part) ->
+        file_receiver.add part
 
     close: ->
         super
@@ -145,13 +272,14 @@ class LocalFileChannel extends ShoRTCut::Channel
             .off('dragleave')
             .off('drop')
 
+
 class RTCTest extends ShoRTCut
     constructor: ->
         super
-        @LocalChatChannel = LocalChatChannel
-        @RemoteChatChannel = RemoteChatChannel
-        @LocalFileChannel = LocalFileChannel
-        @RemoteFileChannel = RemoteFileChannel
+        @LocalTextChannel = LocalTextChannel
+        @RemoteTextChannel = RemoteTextChannel
+        @LocalBinaryChannel = LocalBinaryChannel
+        @RemoteBinaryChannel = RemoteBinaryChannel
 
     assign_local_stream_url: (url) ->
         chat 'Local video connected'
@@ -172,6 +300,9 @@ class RTCTest extends ShoRTCut
 
     callee: ->
         $('h1').text('shoRTCut - callee')
+
+
+
 
 $ ->
     rtctest = new RTCTest()
