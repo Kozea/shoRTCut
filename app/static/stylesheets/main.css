@@ -5,6 +5,11 @@ html, body {
 }
 
 /* line 5, ../sass/main.sass */
+header {
+  overflow: auto;
+}
+
+/* line 8, ../sass/main.sass */
 .videos {
   display: flex;
   justify-content: space-between;
@@ -13,31 +18,31 @@ html, body {
   max-height: 720px;
   max-width: 1280px;
 }
-/* line 11, ../sass/main.sass */
+/* line 14, ../sass/main.sass */
 .videos .localchat {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
-/* line 16, ../sass/main.sass */
+/* line 19, ../sass/main.sass */
 .videos .localchat .local {
   flex: 1;
 }
-/* line 19, ../sass/main.sass */
+/* line 22, ../sass/main.sass */
 .videos .localchat .scrollback {
   flex: 1;
 }
-/* line 22, ../sass/main.sass */
+/* line 25, ../sass/main.sass */
 .videos video.remote {
   flex: 4 1 100%;
 }
-/* line 25, ../sass/main.sass */
+/* line 28, ../sass/main.sass */
 .videos .localchat {
   align-self: flex-end;
   flex: 1 4 100%;
 }
 
-/* line 32, ../sass/main.sass */
+/* line 35, ../sass/main.sass */
 .filedrop {
   transition: 500ms;
   border: 2px dashed #eeeeee;
@@ -47,43 +52,43 @@ html, body {
   font-size: 2em;
   color: #eeeeee;
 }
-/* line 41, ../sass/main.sass */
+/* line 44, ../sass/main.sass */
 .filedrop.hover {
   background-color: #fff4f4;
   color: #ffaaaa;
   border-color: #ffaaaa;
 }
-/* line 46, ../sass/main.sass */
+/* line 49, ../sass/main.sass */
 .filedrop.active {
   color: #aaaaaa;
   border-color: #aaaaaa;
 }
-/* line 50, ../sass/main.sass */
+/* line 53, ../sass/main.sass */
 .filedrop.active.hover {
   background-color: #f4f4ff;
   color: #aaaaff;
   border-color: #aaaaff;
 }
 
-/* line 55, ../sass/main.sass */
+/* line 58, ../sass/main.sass */
 .scrollback {
   max-height: 50%;
   overflow-y: auto;
 }
 
-/* line 59, ../sass/main.sass */
+/* line 62, ../sass/main.sass */
 .progresses {
   width: 100%;
 }
-/* line 62, ../sass/main.sass */
+/* line 65, ../sass/main.sass */
 .progresses tr td:first-child {
   white-space: pre;
 }
-/* line 65, ../sass/main.sass */
+/* line 68, ../sass/main.sass */
 .progresses tr td:last-child {
   width: 100%;
 }
-/* line 67, ../sass/main.sass */
+/* line 70, ../sass/main.sass */
 .progresses tr td:last-child progress {
   width: 100%;
 }
