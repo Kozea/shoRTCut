@@ -208,8 +208,19 @@
   })(ShoRTCut);
 
   $(function() {
-    var rtctest;
-    rtctest = new RTCTest();
+    var debug, options, rtctest;
+    options = window.options;
+    debug = options != null ? options.debug : void 0;
+    rtctest = new RTCTest({
+      turn: {
+        server: options.turn_server,
+        username: options.turn_username,
+        password: options.turn_password
+      },
+      debug: debug,
+      host: location.host,
+      path: location.pathname
+    });
     rtctest.start();
     chat('Connecting...');
     return window.rtc = rtctest;

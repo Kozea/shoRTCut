@@ -153,7 +153,18 @@ class RTCTest extends ShoRTCut
 
 
 $ ->
-    rtctest = new RTCTest()
+    options = window.options
+    debug = options?.debug
+
+    rtctest = new RTCTest
+        turn:
+            server: options.turn_server
+            username: options.turn_username
+            password: options.turn_password
+        debug: debug
+        host: location.host
+        path: location.pathname
+
     rtctest.start()
     chat 'Connecting...'
     window.rtc = rtctest

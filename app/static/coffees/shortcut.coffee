@@ -1,5 +1,4 @@
-options = window.options
-debug = options?.debug
+debug = true
 
 class Loggable
     log: ->
@@ -207,6 +206,7 @@ class ShoRTCut extends Loggable
     WebSocket: WebSocket
 
     constructor: (@options) ->
+        debug = @options.debug
         @Peer = Peer
         @WebSocket = WebSocket
 
@@ -214,7 +214,7 @@ class ShoRTCut extends Loggable
         @FileChannel = BinaryChannel
 
     start: ->
-        @ws = new @WebSocket new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), @
+        @ws = new @WebSocket new window.WebSocket("wss://#{@options.host}/ws#{@options.path}"), @
 
     user_media: ->
         @log 'Getting user media'
@@ -242,9 +242,9 @@ class ShoRTCut extends Loggable
         @peer = new @Peer(new RTCPeerConnection(
             iceServers: [
                 createIceServer('stun:stun.l.google.com:19302'),
-                createIceServer('turn:' + options.turn_server,
-                    options.turn_username,
-                    options.turn_password)
+                createIceServer('turn:' + @options.turn_server,
+                    @options.turn_username,
+                    @options.turn_password)
             ],
             optional: [DtlsSrtpKeyAgreement: true]), @)
 
