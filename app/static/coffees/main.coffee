@@ -4,20 +4,8 @@ chat = (text, type='text') ->
     $sb.append($('<div>')[type](text))
     $sb.stop(true, true).animate scrollTop: $sb.prop('scrollHeight') - $sb.height()
 
-chat_send = null
-file_send = null
 file_receiver = null
 files = []
-
-bytes = (size) ->
-    i = -1
-    byteUnits = [" kB", " MB", " GB", " TB", "PB", "EB", "ZB", "YB"]
-    loop
-        size /= 1000
-        i++
-        break unless size > 1000
-    Math.max(size, 0.1).toFixed(1) + byteUnits[i]
-
 
 make_progress = (text, max) ->
     $('.progresses').append(
@@ -27,32 +15,16 @@ make_progress = (text, max) ->
                 $('<td>').append($progress = $('<progress>', max: max))))
     $progress
 
-class RemoteTextChannel extends ShoRTCut::TextChannel
-    constructor: ->
-        super
-        chat_send = @send.bind @
-
+class TextChannel extends ShoRTCut::TextChannel
     open: ->
         super
-        chat 'Chat Connected'
-
-    close: ->
-        super
-        chat 'Chat Connection closed.'
-
-class LocalTextChannel extends ShoRTCut::TextChannel
-    constructor: ->
-        super
-
-    open: ->
-        super
-        $('input[name=local]')
+        $input = $('input[name=local]')
             .attr('disabled', null)
-            .on 'keyup', (e) ->
-                if e.keyCode is 13 and $(this).val()
-                    chat_send 'CHAT', $(this).val()
-                    chat 'me   < ' + $(this).val()
-                    $(this).val('')
+            .on 'keyup', (e) =>
+                if e.keyCode is 13 and $input.val()
+                    @send 'CHAT', $input.val()
+                    chat 'me   < ' + $input.val()
+                    $input.val('')
 
     CHAT: (message) ->
         chat 'peer > ' + message
@@ -60,13 +32,22 @@ class LocalTextChannel extends ShoRTCut::TextChannel
     ACK: ->
         return unless files.length
         file = files[0]
-        chat_send "FILE|#{file.size},#{file.type},#{file.name}"
+        @send "FILE|#{file.size},#{file.type},#{file.name}"
 
     ACCEPT: ->
         return unless files.length
-        file = files.shift()
+        file = files[0]
         $progress = make_progress "Sending #{file.name}", 100
-        new ShoRTCutHelpers::FileSender file, file_send, (-> chat "File sent."), ((p) -> $progress.val p)
+        new ShoRTCutHelpers::FileSender(
+            file,
+            @rtc.peer.binary_channel.send.bind(@rtc.peer.binary_channel),
+            ->
+                files.shift()
+                chat "File sent."
+            ,
+            (p) ->
+                $progress.val p
+        )
 
     FILE: (message) ->
         args = message.split(',')
@@ -80,15 +61,15 @@ class LocalTextChannel extends ShoRTCut::TextChannel
             name,
             size,
             type,
-            ->
-                chat "Receiving file #{name} #{bytes size}"
-                chat_send "ACCEPT"
+            =>
+                chat "Receiving file #{name} #{ShoRTCutHelpers::bytes size}"
+                @send "ACCEPT"
             ,
-            ->
+            =>
                 chat("peer > File: <a href=\"#{file_receiver.url()}\" download=\"#{file_receiver.name}\">#{file_receiver.name}</a>", 'html')
-                chat_send 'CHAT', "File received ! (received #{bytes file_receiver.size})"
+                @send 'CHAT', "File received ! (received #{ShoRTCutHelpers::bytes file_receiver.size})"
                 file_receiver = null
-                chat_send 'ACK'
+                @send 'ACK'
             ,
             (p) -> $progress.val p
         )
@@ -101,24 +82,7 @@ class LocalTextChannel extends ShoRTCut::TextChannel
             .off('keyup')
 
 
-class RemoteBinaryChannel extends ShoRTCut::BinaryChannel
-    constructor: ->
-        super
-        file_send = @send.bind @
-
-    open: ->
-        super
-        chat 'File Connected'
-
-    close: ->
-        super
-        chat 'File Connection closed.'
-
-
-class LocalBinaryChannel extends ShoRTCut::BinaryChannel
-    constructor: ->
-        super
-
+class BinaryChannel extends ShoRTCut::BinaryChannel
     open: ->
         super
         $('.filedrop')
@@ -144,9 +108,9 @@ class LocalBinaryChannel extends ShoRTCut::BinaryChannel
                 for file in e.dataTransfer.files
                     unless file in files
                         files.push file
-                if files.length
+                if files.length and files.length == e.dataTransfer.files.length
                     file = files[0]
-                    chat_send "FILE|#{file.size},#{file.type},#{file.name}"
+                    @rtc.peer.text_channel.send "FILE|#{file.size},#{file.type},#{file.name}"
                 false
 
     binary: (part) ->
@@ -164,10 +128,8 @@ class LocalBinaryChannel extends ShoRTCut::BinaryChannel
 class RTCTest extends ShoRTCut
     constructor: ->
         super
-        @LocalTextChannel = LocalTextChannel
-        @RemoteTextChannel = RemoteTextChannel
-        @LocalBinaryChannel = LocalBinaryChannel
-        @RemoteBinaryChannel = RemoteBinaryChannel
+        @TextChannel = TextChannel
+        @BinaryChannel = BinaryChannel
 
     assign_local_stream_url: (url) ->
         chat 'Local video connected'
@@ -188,8 +150,6 @@ class RTCTest extends ShoRTCut
 
     callee: ->
         $('h1').text('shoRTCut - callee')
-
-
 
 
 $ ->

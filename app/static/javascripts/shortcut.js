@@ -235,6 +235,7 @@
 
     Peer.prototype.offering = function() {
       this.log('Offering');
+      this.make_channel();
       return this.pc.createOffer(this.caller_local_description.bind(this), this.error.bind(this), {
         mandatory: {
           OfferToReceiveAudio: true,
@@ -281,32 +282,26 @@
     Peer.prototype.data_channel = function(event) {
       this.log('Got remote channel', event.channel);
       if (event.channel.label === 'text') {
-        this.remote_text_channel = new this.rtc.RemoteTextChannel(event.channel);
+        this.text_channel = new this.rtc.TextChannel(event.channel, this.rtc);
       }
       if (event.channel.label === 'binary') {
-        return this.remote_binary_channel = new this.rtc.RemoteBinaryChannel(event.channel);
+        return this.binary_channel = new this.rtc.BinaryChannel(event.channel, this.rtc);
       }
     };
 
     Peer.prototype.make_channel = function() {
       this.log('Got local channel');
-      this.local_text_channel = new this.rtc.LocalTextChannel(this.pc.createDataChannel('text', {}));
-      return this.local_binary_channel = new this.rtc.LocalBinaryChannel(this.pc.createDataChannel('binary', {}));
+      this.text_channel = new this.rtc.TextChannel(this.pc.createDataChannel('text', {}), this.rtc);
+      return this.binary_channel = new this.rtc.BinaryChannel(this.pc.createDataChannel('binary', {}), this.rtc);
     };
 
     Peer.prototype.quit = function() {
-      var _ref2, _ref3, _ref4, _ref5;
-      if ((_ref2 = this.remote_text_channel) != null) {
+      var _ref2, _ref3;
+      if ((_ref2 = this.text_channel) != null) {
         _ref2.quit();
       }
-      if ((_ref3 = this.remote_binary_channel) != null) {
+      if ((_ref3 = this.binary_channel) != null) {
         _ref3.quit();
-      }
-      if ((_ref4 = this.local_text_channel) != null) {
-        _ref4.quit();
-      }
-      if ((_ref5 = this.local_binary_channel) != null) {
-        _ref5.quit();
       }
       return this.pc.close();
     };
@@ -334,10 +329,8 @@
       this.options = options;
       this.Peer = Peer;
       this.WebSocket = WebSocket;
-      this.LocalTextChannel = TextChannel;
-      this.RemoteTextChannel = TextChannel;
-      this.LocalBinaryChannel = BinaryChannel;
-      this.RemoteBinaryChannel = BinaryChannel;
+      this.TextChannel = TextChannel;
+      this.FileChannel = BinaryChannel;
     }
 
     ShoRTCut.prototype.start = function() {
@@ -370,7 +363,7 @@
     };
 
     ShoRTCut.prototype.connect = function() {
-      this.peer = new this.Peer(new RTCPeerConnection({
+      return this.peer = new this.Peer(new RTCPeerConnection({
         iceServers: [createIceServer('stun:stun.l.google.com:19302'), createIceServer('turn:' + options.turn_server, options.turn_username, options.turn_password)],
         optional: [
           {
@@ -378,7 +371,6 @@
           }
         ]
       }), this);
-      return this.peer.make_channel();
     };
 
     ShoRTCut.prototype.ice_out = function(ice) {

@@ -146,6 +146,7 @@ class Peer extends Loggable
 
     offering: ->
         @log 'Offering'
+        @make_channel()
         @pc.createOffer @caller_local_description.bind(@), @error.bind(@),
             mandatory:
                 OfferToReceiveAudio: true
@@ -181,20 +182,18 @@ class Peer extends Loggable
     data_channel: (event) ->
         @log 'Got remote channel', event.channel
         if event.channel.label is 'text'
-            @remote_text_channel = new @rtc.RemoteTextChannel event.channel
+            @text_channel = new @rtc.TextChannel event.channel, @rtc
         if event.channel.label is 'binary'
-            @remote_binary_channel = new @rtc.RemoteBinaryChannel event.channel
+            @binary_channel = new @rtc.BinaryChannel event.channel, @rtc
 
     make_channel: ->
         @log 'Got local channel'
-        @local_text_channel = new @rtc.LocalTextChannel @pc.createDataChannel 'text', {}
-        @local_binary_channel = new @rtc.LocalBinaryChannel @pc.createDataChannel 'binary', {}
+        @text_channel = new @rtc.TextChannel @pc.createDataChannel('text', {}), @rtc
+        @binary_channel = new @rtc.BinaryChannel @pc.createDataChannel('binary', {}), @rtc
 
     quit: ->
-        @remote_text_channel?.quit()
-        @remote_binary_channel?.quit()
-        @local_text_channel?.quit()
-        @local_binary_channel?.quit()
+        @text_channel?.quit()
+        @binary_channel?.quit()
         @pc.close()
 
 
@@ -211,11 +210,8 @@ class ShoRTCut extends Loggable
         @Peer = Peer
         @WebSocket = WebSocket
 
-        @LocalTextChannel = TextChannel
-        @RemoteTextChannel = TextChannel
-
-        @LocalBinaryChannel = BinaryChannel
-        @RemoteBinaryChannel = BinaryChannel
+        @TextChannel = TextChannel
+        @FileChannel = BinaryChannel
 
     start: ->
         @ws = new @WebSocket new window.WebSocket('wss://' + document.location.host + '/ws' + location.pathname), @
@@ -251,7 +247,6 @@ class ShoRTCut extends Loggable
                     options.turn_password)
             ],
             optional: [DtlsSrtpKeyAgreement: true]), @)
-        @peer.make_channel()
 
     ice_out: (ice) ->
         @ws.send 'ICE', ice

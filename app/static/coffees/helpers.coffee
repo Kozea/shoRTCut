@@ -33,7 +33,6 @@ class FileReceiver extends FileHelper
     constructor: (@name, @size, @type, @ready, @end, @progress) ->
         @parts = []
         @length = 0
-        @ready()
 
     add: (part) ->
         @parts.push part
@@ -46,13 +45,13 @@ class FileReceiver extends FileHelper
 class DiskFileReceiver extends FileReceiver
     flush_length: 16
 
-    constructor: (@name, @size, @type, @ready, @end, @progress) ->
+    constructor: ->
         super
         @flushing = false
         @callbacks = []
         rfs(
             TEMPORARY,
-            size,
+            @size,
             (fs) =>
                 get_file = =>
                     fs.root.getFile(
@@ -106,6 +105,10 @@ class DiskFileReceiver extends FileReceiver
 
 
 class MemoryFileReceiver extends FileReceiver
+    constructor: ->
+        super
+        @ready()
+
     add: (part) ->
         super
         if @length >= @size
@@ -116,7 +119,17 @@ class MemoryFileReceiver extends FileReceiver
 
 
 getFileReceiver = ->
-    if rfs then DiskFileReceiver else ShoRTCutHelpers::MemFileReceiver
+    if rfs then DiskFileReceiver else MemoryFileReceiver
+
+
+bytes = (size) ->
+    i = -1
+    byteUnits = 'kMGTPEZY'
+    loop
+        size /= 1000
+        i++
+        break unless size > 1000
+    "#{Math.max(size, 0.1).toFixed(1)} #{byteUnits[i] or '?'}B"
 
 
 class ShoRTCutHelpers
@@ -125,5 +138,6 @@ class ShoRTCutHelpers
     DiskFileReceiver: DiskFileReceiver
     MemoryFileReceiver: MemoryFileReceiver
     getFileReceiver: getFileReceiver
+    bytes: bytes
 
 @ShoRTCutHelpers = ShoRTCutHelpers
