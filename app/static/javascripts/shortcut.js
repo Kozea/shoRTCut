@@ -363,7 +363,7 @@
 
     ShoRTCut.prototype.connect = function() {
       return this.peer = new this.Peer(new RTCPeerConnection({
-        iceServers: [createIceServer('stun:stun.l.google.com:19302'), createIceServer('turn:' + this.options.turn_server, this.options.turn_username, this.options.turn_password)],
+        iceServers: [createIceServer('stun:stun.l.google.com:19302'), createIceServer('turn:' + this.options.turn.server, this.options.turn.username, this.options.turn.password)],
         optional: [
           {
             DtlsSrtpKeyAgreement: true
@@ -381,7 +381,10 @@
     };
 
     ShoRTCut.prototype.reset = function() {
-      this.peer.quit();
+      var _ref2;
+      if ((_ref2 = this.peer) != null) {
+        _ref2.quit();
+      }
       return this.connect();
     };
 

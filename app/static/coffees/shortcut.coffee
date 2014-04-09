@@ -242,9 +242,9 @@ class ShoRTCut extends Loggable
         @peer = new @Peer(new RTCPeerConnection(
             iceServers: [
                 createIceServer('stun:stun.l.google.com:19302'),
-                createIceServer('turn:' + @options.turn_server,
-                    @options.turn_username,
-                    @options.turn_password)
+                createIceServer('turn:' + @options.turn.server,
+                    @options.turn.username,
+                    @options.turn.password)
             ],
             optional: [DtlsSrtpKeyAgreement: true]), @)
 
@@ -255,7 +255,7 @@ class ShoRTCut extends Loggable
         @peer.ice_in ice
 
     reset: ->
-        @peer.quit()
+        @peer?.quit()
         @connect()
 
     # Mandatory Overrides

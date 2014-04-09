@@ -1,0 +1,17 @@
+{
+  "name": "shoRTCut",
+  "version": "1.0.0",
+  "homepage": "https://github.com/Kozea/shoRTCut",
+  "authors": [
+    "Florian Mounier <florian.mounier@kozea.fr>"
+  ],
+  "description": "WebRTC Websocket signalling server implementation",
+  "main": [
+    "./app/static/javascripts/shortcut.js",
+    "./app/static/javascripts/helpers.js"
+    ]
+  "keywords": [
+    "webrtc"
+  ],
+  "license": "BSD"
+}
