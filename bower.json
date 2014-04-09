@@ -9,7 +9,7 @@
   "main": [
     "./app/static/javascripts/shortcut.js",
     "./app/static/javascripts/helpers.js"
-    ]
+  ],
   "keywords": [
     "webrtc"
   ],
