@@ -30,7 +30,7 @@ class WebSocket(Route, tornado.websocket.WebSocketHandler):
 
     def open(self, uid):
         self.log.info('Websocket opened with id %s' % uid)
-        self.id = uid.decode('utf-8')
+        self.id = uid
 
         if len(self.room) >= 2:
             self.send('FULL')
