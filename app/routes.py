@@ -63,6 +63,9 @@ class WebSocket(Route, tornado.websocket.WebSocketHandler):
         else:
             self.correspondent.send(message)
 
+    def check_origin(self, origin):
+        return True
+
     def on_close(self):
         self.log.info('Websocket closed')
         self.room.remove(self)
