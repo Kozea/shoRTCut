@@ -18,6 +18,7 @@ tornado.options.define("port", default=3615, type=int, help="Server port")
 tornado.options.define("turn_server", default='', help="TURN server")
 tornado.options.define("turn_username", default='', help="TURN username")
 tornado.options.define("turn_password", default='', help="TURN password")
+tornado.options.define("ssl", default=False, help="Use SSL")
 tornado.options.define("ssl_cert",
                        default=os.path.join(
                            os.path.dirname(__file__), 'server.pem'),
@@ -70,15 +71,19 @@ ioloop = tornado.ioloop.IOLoop.instance()
 
 
 from app import application
-tornado.httpserver.HTTPServer(application, ssl_options={
-    'certfile': tornado.options.options.ssl_cert,
-    'keyfile': tornado.options.options.ssl_key,
-    'ca_certs': tornado.options.options.ssl_ca,
-}).listen(tornado.options.options.port)
+if tornado.options.options.ssl:
+    tornado.httpserver.HTTPServer(application, ssl_options={
+        'certfile': tornado.options.options.ssl_cert,
+        'keyfile': tornado.options.options.ssl_key,
+        'ca_certs': tornado.options.options.ssl_ca,
+    }).listen(tornado.options.options.port)
+    url = "https://%s:%d/*" % (
+        tornado.options.options.host, tornado.options.options.port)
+else:
+    application.listen(tornado.options.options.port)
+    url = "https://%s:%d/*" % (
+        tornado.options.options.host, tornado.options.options.port)
 
-
-url = "https://%s:%d/*" % (
-    tornado.options.options.host, tornado.options.options.port)
 
 if tornado.options.options.debug:
     try:
